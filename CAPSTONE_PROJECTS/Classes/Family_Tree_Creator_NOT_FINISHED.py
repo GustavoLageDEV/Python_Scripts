@@ -92,5 +92,6 @@ if __name__ == "__main__":
 	lionel = Person("Lionel",(20,2,2015),(rafael,laura))
 	selena = Person("Selena",(14,8,2016),(rafael,laura))
 	cristiano = Person("Cristiano",(5,4,2010),(wesley,alana))
+	ronaldo = Person("Ronaldo",(5,4,2010),(rafael,laura))
 
 	display_tree(family_list)
