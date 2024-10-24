@@ -1,10 +1,14 @@
 #**Family Tree Creator** - Create a class called Person which will have a name, when they were born and when (and if) they died. 
 #Allow the user to create these Person classes and put them into a family tree structure. Print out the tree to the screen. 
 
+# PRIORITY FOR PRINTING (LEFT TO RIGHT):
+# 1 - ORDER OF PARENTS 
+# 2 - GENERATION
+# 3 - MARRIED THEN SINGLES
+# 4 - AGE (OLDER TO YOUNGER)
+
 # FEATURES TO BE IMPLEMENTED: 
 # - CHILDREN RIGHT BELOW PARENTS 
-# - FROM OLDER TO YOUNGER 
-# - ID WHO IS CHILD OF WHO (DONE)
 
 from datetime import datetime
 
@@ -33,7 +37,7 @@ class Person:
 
 		family_list.append(self)
 
-def older_to_younger(family_list): # WORK IN PROGRESS
+def sort_older_to_younger(family_list): 
 	if family_list == []:
 		return family_list
 	else:
@@ -49,6 +53,16 @@ def older_to_younger(family_list): # WORK IN PROGRESS
 					age_sorted_list.append(person)
 
 		return age_sorted_list
+	
+def sort_marriage(family_list): 
+	if family_list == []:
+		return family_list
+	else:
+		for person in family_list[:][::-1]:
+			if person.spouse != '':
+				family_list.remove(person)
+				family_list.insert(0,person)
+	return family_list
 
 def id_parents(person):
 	letters_parents = ""
@@ -64,31 +78,32 @@ def check_gen(family_list,gen):
 	print(f"\n\nGeneration {gen+1}:", end="")
 	return gen + 1
 
-def display_tree(family_list):
+def display_tree(family_list,children_list):
 	gen = 1
 	print(30*" " + "This is our Family Tree!")
 	print(f"\nGeneration {gen}:", end="")
 	while family_list != []:
 		gen = check_gen(family_list,gen)
 		singles_childs_list = []
+		children_list = sort_older_to_younger(children_list)
 		if children_list != []:
 			for child in children_list[:]:
 				if child.children != []:
-					print(f"\t{id_parents(child)}{child.name} S2 {child.spouse.name}\t", end="")
+					print(f"\t{id_parents(child)}{child.name} S2 {child.spouse.name} ", end="")
 					family_list.remove(child)
 					family_list.remove(child.spouse)
 					children_list.remove(child)
 					children_list.extend(child.children)
 				else:
 					singles_childs_list.append(child)
-			singles_childs_list = older_to_younger(singles_childs_list)
+			singles_childs_list = sort_older_to_younger(singles_childs_list)
 			for single in singles_childs_list:
 				print("\t" + id_parents(single) + single.name, end="")
 				print("\t", end="")
 				family_list.remove(single)
 				children_list.remove(single)
 		else:
-			family_list = older_to_younger(family_list)
+			family_list = sort_older_to_younger(family_list)
 			for person in family_list:
 				if person.family_gen == gen: # Generation order
 					if person.children != []:
@@ -98,21 +113,58 @@ def display_tree(family_list):
 						family_list.remove(couple[1])
 						children_list.extend(person.children)
 
+def print_children(family_list,children_list=[]): # WORK IN PROGRESS
+	gen = 1
+	print(30*" " + "This is our Family Tree!")
+	print(f"\nGeneration {gen}:", end="")
+	while family_list != []:
+		gen = check_gen(family_list,gen)
+		singles_childs_list = []
+		children_list = sort_older_to_younger(children_list)
+		children_list = sort_marriage(children_list)
+		if children_list != []:
+			for child in children_list[:]:
+				if child.children != []:
+					print(f"\t{id_parents(child)}{child.name} S2 {child.spouse.name} ", end="")
+					family_list.remove(child)
+					family_list.remove(child.spouse)
+					children_list.remove(child)
+					children_list.extend(child.children)
+				else:
+					singles_childs_list.append(child)
+			singles_childs_list = sort_older_to_younger(singles_childs_list)
+			for single in singles_childs_list:
+				print("\t" + id_parents(single) + single.name, end="")
+				print("\t", end="")
+				family_list.remove(single)
+				children_list.remove(single)
+		else:
+			family_list = sort_older_to_younger(family_list)
+			for person in family_list:
+				if person.family_gen == gen: # Generation order
+					if person.children != []:
+						print(f"\t{person.name} S2 {person.spouse.name}\t", end="")
+						family_list.remove(person)
+						family_list.remove(person.spouse)
+						children_list.append(person.children)
+						break
+
 if __name__ == "__main__":
 
 	family_list = []
 	children_list = []
 
 	odin = Person("Odin","1-1-1900")
-	freya = Person("Freya","2-2-1900")
-	rafael = Person("Rafael","22-10-1980",(odin,freya))
+	frigga = Person("Frigga","2-2-1900")
+	rafael = Person("Rafael","22-10-1980",(odin,frigga))
 	laura = Person("Laura","8-9-1982")
 	wesley = Person("Wesley","7-7-1981")
-	alana = Person("Alana","20-4-1985",(odin,freya))
+	alana = Person("Alana","20-4-1972",(odin,frigga))
 	lionel = Person("Lionel","22-12-2014",(rafael,laura))
 	selena = Person("Selena","15-3-2010",(rafael,laura))
 	cristiano = Person("Cristiano","12-2-2021",(wesley,alana))
 	ronaldo = Person("Ronaldo","12-11-2022",(rafael,laura))
-	thor = Person("Thor","3-3-1915",(odin,freya))
+	thor = Person("Thor","3-3-1915",(odin,frigga))
+	hela = Person("Hela","12-12-1910",(odin,frigga))
 	
-	display_tree(family_list)
+	display_tree(family_list,children_list)
