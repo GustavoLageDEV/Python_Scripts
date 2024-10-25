@@ -4,8 +4,8 @@
 # PRIORITY FOR PRINTING (LEFT TO RIGHT):
 # 1 - ORDER OF PARENTS 
 # 2 - GENERATION
-# 3 - MARRIED THEN SINGLES
-# 4 - AGE (OLDER TO YOUNGER)
+# 3 - MARRIED THEN SINGLES 
+# 4 - AGE (OLDER TO YOUNGER) 
 
 # FEATURES TO BE IMPLEMENTED: 
 # - CHILDREN RIGHT BELOW PARENTS 
@@ -54,7 +54,7 @@ def sort_older_to_younger(family_list):
 
 		return age_sorted_list
 	
-def sort_marriage(family_list): 
+def sort_marriage(family_list): # 
 	if family_list == []:
 		return family_list
 	else:
@@ -119,25 +119,21 @@ def print_children(family_list,children_list=[]): # WORK IN PROGRESS
 	print(f"\nGeneration {gen}:", end="")
 	while family_list != []:
 		gen = check_gen(family_list,gen)
-		singles_childs_list = []
 		children_list = sort_older_to_younger(children_list)
 		children_list = sort_marriage(children_list)
 		if children_list != []:
 			for child in children_list[:]:
-				if child.children != []:
+				if child.spouse != []:
 					print(f"\t{id_parents(child)}{child.name} S2 {child.spouse.name} ", end="")
 					family_list.remove(child)
 					family_list.remove(child.spouse)
-					children_list.remove(child)
-					children_list.extend(child.children)
+					if child.children_list != []:
+						children_list.remove(child)
+						children_list.extend(child.children)
 				else:
-					singles_childs_list.append(child)
-			singles_childs_list = sort_older_to_younger(singles_childs_list)
-			for single in singles_childs_list:
-				print("\t" + id_parents(single) + single.name, end="")
-				print("\t", end="")
-				family_list.remove(single)
-				children_list.remove(single)
+					print("\t" + id_parents(child) + child.name, end="")
+					family_list.remove(child)
+					children_list.remove(child)
 		else:
 			family_list = sort_older_to_younger(family_list)
 			for person in family_list:
@@ -147,12 +143,10 @@ def print_children(family_list,children_list=[]): # WORK IN PROGRESS
 						family_list.remove(person)
 						family_list.remove(person.spouse)
 						children_list.append(person.children)
-						break
 
 if __name__ == "__main__":
 
 	family_list = []
-	children_list = []
 
 	odin = Person("Odin","1-1-1900")
 	frigga = Person("Frigga","2-2-1900")
