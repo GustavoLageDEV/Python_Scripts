@@ -147,6 +147,7 @@ def print_children(family_list,children_list=[]): # WORK IN PROGRESS
 if __name__ == "__main__":
 
 	family_list = []
+	children_list = []
 
 	odin = Person("Odin","1-1-1900")
 	frigga = Person("Frigga","2-2-1900")
@@ -160,5 +161,6 @@ if __name__ == "__main__":
 	ronaldo = Person("Ronaldo","12-11-2022",(rafael,laura))
 	thor = Person("Thor","3-3-1915",(odin,frigga))
 	hela = Person("Hela","12-12-1910",(odin,frigga))
+	loki = Person("Loki","12-10-1905",(odin,frigga))
 	
 	display_tree(family_list,children_list)
