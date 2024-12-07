@@ -34,3 +34,5 @@ def book_loan(user_id,book_id):
     return cursor.fetchone()[0]
 
 #add_book("Memórias Póstumas de Brás Cubas","Machado de Assis")
+
+print(cursor.execute("SELECT copies_avaiable FROM books WHERE book_id = 1"))
