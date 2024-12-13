@@ -6,20 +6,29 @@
 #               4 - INTERFACE
 
 # DB mylibrary: TABLES: users: user_id(SERIAL), first_name, last_name, email(NOT NULL UNIQUE), created_on, last_login
-#                       books: book_id, title, author, copies_available, created_at
-#                       loans: loan_id, user_id, book_id, loan_date, return_date
+#                       books: book_id(SERIAL), title, author, copies_available, created_at
+#                       loans: loan_id(SERIAL), user_id(F.KEY), book_id(F.KEY), loan_date, return_date
 
-import csv
+import csv, datetime 
 import psycopg2 as pg2
-import datetime 
+import random as rd
 
-# Conexão com o banco de dados
+# Connection with Postgres Database
 conn = pg2.connect(dbname="mylibrary_project", user="postgres", password="373500")
 
 cursor = conn.cursor()
 
-#Function to add data from a .csv file to the DB
-def add_data():
+# Return total users from the database
+def total_users():
+    cursor.execute("SELECT COUNT(*) FROM users")
+    return cursor.fetchone()[0]
+
+def total_books():
+    cursor.execute("SELECT COUNT(*) FROM books")
+    return cursor.fetchone()[0]
+#Function to add data from a .csv file to the Database
+def add_data_from_file():
+
     while True:
         try:
             print("Input 1 for users` data.\nInput 2 for books` data.\nInput 0 to cancel")
@@ -54,6 +63,7 @@ def add_data():
         return print("That`s not a valid .csv path file")
     
     if choice == 1:
+        total_users = total_users()
         for index, header in enumerate(data_lines[0]):
             if header.lower() == 'name':
                 name_index = index
@@ -68,9 +78,13 @@ def add_data():
             email = row[email_index]
             add_user(first_name,last_name,email)
 
-        return print(f"{len(data_lines)-1} users added to Database.")
+        cursor.execute("SELECT COUNT(*) FROM users")
+        new_total_users = cursor.fetchone()[0]
+        new_users = new_total_users - total_users
+        return print(f"{new_users} new users added to Database.")
     
     if choice == 2:
+        total_books = total_books()
         for index, header in enumerate(data_lines[0]):
             if header.lower() == 'title':
                 title_index = index
@@ -85,7 +99,10 @@ def add_data():
             copies = row[copies_index]
             add_book(title,author,copies)
 
-        return print(f"{len(data_lines)-1} books added to Database.")
+        new_total_books = total_books()
+        new_books = new_total_books - total_books
+
+        return print(f"{new_books} new books added to Database.")
 
 def add_user(first_name,last_name,email):
     first_name = first_name.title()
@@ -99,12 +116,12 @@ def add_user(first_name,last_name,email):
         return print(f"Error: The email: {email} is already in use.")
 
 def add_book(title,author,copies = 1):
-    cursor.execute("SELECT book_id FROM books WHERE title ILIKE '%s%'", (title,))
-    book_id = cursor.fetchone()[0]
-    if book_id != None:
-        cursor.execute("UPDATE books SET copies_available = copies_available + %s",(copies,))
+    cursor.execute("SELECT COUNT(book_id) FROM books WHERE title ILIKE %s", ('%' + title + '%',))
+    book_in_database = cursor.fetchone()[0]
+    if book_in_database:
+        cursor.execute("UPDATE books SET copies_available = copies_available + %s WHERE title ILIKE %s RETURNING book_id",(copies,title))
         conn.commit()
-        return print(f"Added {copies} copies of the book: {title} Id: {book_id}")
+        return print(f"Added {copies} copies of the book: {title} Id: {cursor.fetchone()[0]}")
     
     else:
         title = title.title()
@@ -118,14 +135,14 @@ def loan_book(user_id,book_id):
     cursor.execute("SELECT copies_available FROM books WHERE book_id = %s", (book_id,))
     copies_available = cursor.fetchone()[0]
     if copies_available == 0:
-        return print("This book has no copies avaiable at this moment")
+        return print(f"The book has no copies avaiable at this moment")
     else:
         cursor.execute("INSERT INTO loans(user_id,book_id,loan_date) VALUES(%s,%s,%s) RETURNING loan_id",(user_id,book_id, datetime.datetime.now()))
         loan_id = cursor.fetchone()[0]
         cursor.execute("UPDATE books SET copies_available = copies_available - 1 WHERE book_id = %s",(book_id,))
         cursor.execute("UPDATE users SET last_login = %s WHERE user_id = %s" , (datetime.datetime.now(),user_id))
         conn.commit()
-        return print(f"Loan made with loan_id = {loan_id}")
+        return print(f"Loan successfully made. ID: {loan_id}")
     
 def return_book(loan_id):
     cursor.execute("SELECT user_id,book_id FROM loans WHERE loan_id = %s", (loan_id,))
@@ -138,3 +155,16 @@ def return_book(loan_id):
     conn.commit()
     return print(f"Book returned successfully")
 
+def loan_emulator(loan_quantity):
+    cursor.execute("SELECT user_id FROM users")
+    all_users_id = cursor.fetchall() # LIST of tuples (user_id,)
+    cursor.execute("SELECT book_id FROM books")
+    all_books_id = cursor.fetchall() # LIST of tuples (book_id,)
+
+    for loan in range(loan_quantity):
+        user_id = rd.choice(all_users_id)[0]
+        book_id = rd.choice(all_books_id)[0]
+
+        loan_book(user_id,book_id)
+
+loan_emulator(9990)
