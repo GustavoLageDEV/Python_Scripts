@@ -12,6 +12,7 @@
 import csv, datetime 
 import psycopg2 as pg2
 import random as rd
+import pandas as pd
 
 # Connection with Postgres Database
 conn = pg2.connect(dbname="mylibrary_project", user="postgres", password="373500")
@@ -167,4 +168,18 @@ def loan_emulator(loan_quantity):
 
         loan_book(user_id,book_id)
 
-loan_emulator(9990)
+def book_popularity_report(book_quantity=10): #UNFINISHED 
+    cursor.execute("""SELECT books.book_id, title, COUNT(*) AS total_loans FROM loans
+                        JOIN books ON books.book_id = loans.book_id
+                        GROUP BY books.book_id, title
+                        ORDER BY total_loans DESC
+                        LIMIT %s""",(book_quantity,))
+
+    report = cursor.fetchall()
+
+    columns = [desc[0] for desc in cursor.description]
+    report_visualisation = pd.DataFrame(report, columns=columns)
+
+    print(report_visualisation)
+
+book_popularity_report()
