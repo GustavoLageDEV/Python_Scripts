@@ -154,12 +154,12 @@ def return_book(loan_id):
     cursor.execute("UPDATE books SET copies_available = copies_available + 1 WHERE book_id = %s" , (book_id,))
     cursor.execute("UPDATE loans SET return_date = %s WHERE loan_id = %s" , (datetime.datetime.now(),loan_id))
     conn.commit()
-    return print(f"Book returned successfully")
+    return print(f"Loan {loan_id} finished. Book returned successfully")
 
-def loan_emulator(loan_quantity):
+def loan_simulator(loan_quantity): #Simulates random loans
     cursor.execute("SELECT user_id FROM users")
     all_users_id = cursor.fetchall() # LIST of tuples (user_id,)
-    cursor.execute("SELECT book_id FROM books")
+    cursor.execute("SELECT book_id FROM books WHERE copies_available > 0")
     all_books_id = cursor.fetchall() # LIST of tuples (book_id,)
 
     for loan in range(loan_quantity):
@@ -167,8 +167,28 @@ def loan_emulator(loan_quantity):
         book_id = rd.choice(all_books_id)[0]
 
         loan_book(user_id,book_id)
+        cursor.execute("SELECT copies_available FROM books WHERE book_id = %s",(book_id,))
+        if cursor.fetchone()[0] == 0:
+            all_books_id.remove((book_id,))
 
-def book_popularity_report(book_quantity=10): #UNFINISHED 
+def return_simulator(return_quantity): # Simulates random returns
+
+    cursor.execute("SELECT loan_id FROM loans WHERE return_date IS NULL")
+    open_loans_id = cursor.fetchall()  # LIST of tuples (loan_id,)
+    if open_loans_id != []:
+        if return_quantity > len(open_loans_id):
+            return_quantity = len(open_loans_id)
+
+        for loan in range(return_quantity):
+            index_loan = rd.randrange(len(open_loans_id))
+            chosen_loan = open_loans_id.pop(index_loan)
+            loan_id = chosen_loan[0]
+            return_book(loan_id)
+    
+    else:
+        return print("There are no open loans at this moment.")
+
+def book_popularity_report(book_quantity=None): # If no parameter is passed, return the whole report
     cursor.execute("""SELECT books.book_id, title, COUNT(*) AS total_loans FROM loans
                         JOIN books ON books.book_id = loans.book_id
                         GROUP BY books.book_id, title
@@ -182,4 +202,47 @@ def book_popularity_report(book_quantity=10): #UNFINISHED
 
     print(report_visualisation)
 
-book_popularity_report()
+def users_activity_report(user_quantity=None):
+    cursor.execute("""SELECT users.user_id, first_name, last_name, COUNT(*) AS total_loans FROM loans
+                    JOIN users ON users.user_id = loans.user_id
+                    GROUP BY users.user_id, first_name, last_name
+                    ORDER BY total_loans DESC
+                    LIMIT %s""",(user_quantity,))
+
+    report = cursor.fetchall()
+
+    columns = [desc[0] for desc in cursor.description]
+    report_visualisation = pd.DataFrame(report, columns=columns)
+
+    print(report_visualisation)
+
+def reports_menu():
+    valid_options = ["0","1","2"]
+    while True:
+        print("""
+Welcome to the report`s menu. Right now we`ve only a few options of reports, but feel free to try.
+    1 - Books Popularity.
+    2 - Users Activity.
+    0 - Quit
+""")
+
+        choice = input("Type here: ").strip()
+
+        if choice not in valid_options:
+            print("Invalid option.")
+            continue
+
+        if choice == "0":
+            print("Quitting the report`s menu. Bye")
+            break
+
+        if choice == "1":
+            book_popularity_report()
+            break
+
+        if choice == "2":
+            users_activity_report()
+            break
+
+def add_new_info():
+    
