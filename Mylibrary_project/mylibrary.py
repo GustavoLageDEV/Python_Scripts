@@ -9,14 +9,13 @@
 #                       books: book_id(SERIAL), title, author, copies_available, created_at
 #                       loans: loan_id(SERIAL), user_id(F.KEY), book_id(F.KEY), loan_date, return_date
 
-import csv, datetime 
+import os, csv, datetime 
 import psycopg2 as pg2
 import random as rd
 import pandas as pd
 
 # Connection with Postgres Database
 conn = pg2.connect(dbname="mylibrary_project", user="postgres", password="373500")
-
 cursor = conn.cursor()
 
 # Return total users from the database
@@ -28,50 +27,51 @@ def total_books():
     cursor.execute("SELECT COUNT(*) FROM books")
     return cursor.fetchone()[0]
 #Function to add data from a .csv file to the Database
-def add_data_from_file():
+def add_data():
 
-    while True:
-        try:
-            print("Input 1 for users` data.\nInput 2 for books` data.\nInput 0 to cancel")
-            choice = int(input("\nType here: "))
-            if choice not in [0,1,2]:
-                print("Invalid input. (0, 1 or 2)")
-                continue
-            elif choice == 0:
-                return print("Input of data was cancelled.")
+    data = file_reader()
+    if "email" in data.columns:
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'")
+        db_users_headers = cursor.fetchall() # LIST of tuples (header,)
+        db_users_headers = [header[0] for header in db_users_headers] # MADE A DIRECT LIST OF HEADERS
+        total_users = total_users()
+
+        #ver oq tem exclusivamente nos hedears do arquivo
+        new_headers = set(data.columns) - set(db_users_headers)
+        print(f"These are columns not present on our DataBase: " + ', '.join(new_headers))
+        #perguntar se o usuario gostaria de adicionar alguma das novas informacoes
+        while True:
+            choice = input("Would you like to include any of this new info into our database? Y or N").lower().strip()[0]
+            if choice not in ['y','n']:
+                print("Invalid option: Try Y or N.")
             else:
-                while True:
-                    file_path = input("Please input the .csv file path: Type 0 to return.\n")
-                    file_path = file_path.strip('"')
-                    if file_path == '0':
-                        break
-                    if not file_path.endswith('.csv'):
-                        print("Not an .csv file")
-                        continue
-                    else:
-                        break  
-                if file_path == '0':
+                break
+        #se sim: Perguntar quais informaçoes vao ser adicionadas ao DB.
+        if choice == 'y':
+            print("From the following, choose what new info to input in our Database. Type in the respective number (one at a time): ")
+            while True:
+                for index, header in enumerate(new_headers):
+                    print(index + ' - ' + header)
+                try:
+                    index_new_header = int(input().strip())
+                except ValueError:
+                    print("Not a valid number")
+                    continue
+                if index_new_header not in range(len(new_headers)):
+                    print("Invalid option. Input a valid number")
                     continue
                 else:
-                    break
-        except:
-            print("Invalid input. (0, 1 or 2)")
-    try:
-        data = open(file_path,encoding = 'utf-8')
-        csv_data = csv.reader(data)
-        data_lines = list(csv_data)
-    except FileNotFoundError:
-        return print("That`s not a valid .csv path file")
-    
-    if choice == 1:
-        total_users = total_users()
-        for index, header in enumerate(data_lines[0]):
-            if header.lower() == 'name':
-                name_index = index
-            elif header.lower() == 'email':
-                email_index = index
+                    #definido as infos (headers) comando SQL para criar as novas colunas
+                    column_name = new_headers[index_new_header]
+                    column_data_type = input('Please input a data type for this column: ')
+                    cursor.execute("ALTER TABLE users ADD COLUMN %s %s",(column_name,column_data_type))
 
-        for row in data_lines[1:]:
+            
+        #se nao: prosseguir com adicionar (se possivel) novos usuarios
+        if choice == 'n':
+
+        #assim que definidas todas as colunas, adicionar os novos usuarios, e novas informaçoes de usuarios existentes      
+        for row in data[1:]:
             name = row[name_index]
             name_parts = name.split()
             first_name = name_parts[0]
@@ -84,9 +84,12 @@ def add_data_from_file():
         new_users = new_total_users - total_users
         return print(f"{new_users} new users added to Database.")
     
-    if choice == 2:
+    if "book_id" in data.columns:
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'")
+        db_books_headers = cursor.fetchall() # LIST of tuples (header,)
+        
         total_books = total_books()
-        for index, header in enumerate(data_lines[0]):
+        for index, header in enumerate(data[0]):
             if header.lower() == 'title':
                 title_index = index
             elif header.lower() == 'author':
@@ -94,7 +97,7 @@ def add_data_from_file():
             elif header.lower() == 'copies_available':
                 copies_index = index
 
-        for row in data_lines[1:]:
+        for row in data:
             title = row[title_index]
             author = row[author_index]
             copies = row[copies_index]
@@ -200,7 +203,7 @@ def book_popularity_report(book_quantity=None): # If no parameter is passed, ret
     columns = [desc[0] for desc in cursor.description]
     report_visualisation = pd.DataFrame(report, columns=columns)
 
-    print(report_visualisation)
+    print(report_visualisation.to_string(index=False))
 
 def users_activity_report(user_quantity=None):
     cursor.execute("""SELECT users.user_id, first_name, last_name, COUNT(*) AS total_loans FROM loans
@@ -214,7 +217,7 @@ def users_activity_report(user_quantity=None):
     columns = [desc[0] for desc in cursor.description]
     report_visualisation = pd.DataFrame(report, columns=columns)
 
-    print(report_visualisation)
+    print(report_visualisation.to_string(index=False))
 
 def reports_menu():
     valid_options = ["0","1","2"]
@@ -244,5 +247,33 @@ Welcome to the report`s menu. Right now we`ve only a few options of reports, but
             users_activity_report()
             break
 
-def add_new_info():
+def file_reader(): 
+    supported_file_ext = ['.csv','.json','.xml','.xls', '.xlsx']
+    while True:    
+        file_path = input("Input path file here: ").strip('"')
+
+        if not os.path.isfile(file_path):
+            print("File not found. Please check the path and try again.")
+            continue
+
+        file_ext = os.path.splitext(file_path)[1]
+        if file_ext not in supported_file_ext:
+            print(f"Unsupported file extension. Supported extensions: {', '.join(supported_file_ext)}")
+            continue
     
+        try:
+            if file_ext == ".csv":
+                data = pd.read_csv(file_path,encoding = 'utf-8')
+            if file_ext == ".json":
+                data = pd.read_json(file_path,encoding = 'utf-8')
+            if file_ext == ".xml":
+                data = pd.read_xml(file_path,encoding = 'utf-8')
+            if file_ext in [".xls", ".xlsx"]:
+                data = pd.read_excel(file_path,encoding = 'utf-8')
+
+            print("File loaded successfully!")
+            return data
+        
+        except Exception as e:
+            print(f"An error occurred while loading the file: {e}")
+            return None
