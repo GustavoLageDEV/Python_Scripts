@@ -9,7 +9,7 @@
 #                       books: book_id(SERIAL), title, author, copies_available, created_at
 #                       loans: loan_id(SERIAL), user_id(F.KEY), book_id(F.KEY), loan_date, return_date
 
-import os, csv, datetime 
+import os, datetime 
 import psycopg2 as pg2
 import random as rd
 import pandas as pd
@@ -30,62 +30,67 @@ def total_books():
 def add_data():
 
     data = file_reader()
-    if "email" in data.columns:
-        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'")
+    table_name = input("Input here the table`s name that you wish to add this data to: ")
+    try:
+        cursor.execute(f"SELECT * FROM {table_name}")
+    except pg2.errors.UndefinedTable:
+        conn.rollback()
+        return print("There isn't a table with this name.")
+    while True:
+        cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'")
         db_users_headers = cursor.fetchall() # LIST of tuples (header,)
         db_users_headers = [header[0] for header in db_users_headers] # MADE A DIRECT LIST OF HEADERS
-        total_users = total_users()
+        new_headers = [column for column in (set(data.columns) - set(db_users_headers))]
 
-        #ver oq tem exclusivamente nos hedears do arquivo
-        new_headers = set(data.columns) - set(db_users_headers)
-        print(f"These are columns not present on our DataBase: " + ', '.join(new_headers))
-        #perguntar se o usuario gostaria de adicionar alguma das novas informacoes
-        while True:
-            choice = input("Would you like to include any of this new info into our database? Y or N").lower().strip()[0]
-            if choice not in ['y','n']:
-                print("Invalid option: Try Y or N.")
-            else:
-                break
-        #se sim: Perguntar quais informaçoes vao ser adicionadas ao DB.
+        print(f"These are the columns not present on our DataBase: " + ', '.join(new_headers))
+        choice = input("Would you like to include a new column into our database? Y or N").lower().strip()[0]
+        if choice not in ['y','n']:
+            print("Invalid option: Try Y or N.")
+            continue
+
         if choice == 'y':
-            print("From the following, choose what new info to input in our Database. Type in the respective number (one at a time): ")
             while True:
+                print("From the following, choose what column to input in our Database. Type in the respective number (one at a time): ")
                 for index, header in enumerate(new_headers):
-                    print(index + ' - ' + header)
+                    print(index, ' - ' + header)
                 try:
                     index_new_header = int(input().strip())
-                except ValueError:
-                    print("Not a valid number")
-                    continue
-                if index_new_header not in range(len(new_headers)):
-                    print("Invalid option. Input a valid number")
-                    continue
-                else:
-                    #definido as infos (headers) comando SQL para criar as novas colunas
                     column_name = new_headers[index_new_header]
-                    column_data_type = input('Please input a data type for this column: ')
-                    cursor.execute("ALTER TABLE users ADD COLUMN %s %s",(column_name,column_data_type))
+                except ValueError or IndexError:
+                    print("Not a valid option.")
+                    continue
+                data_type_options = ('INT','VARCHAR','DATE','TIMESTAMP')
+                while True:
+                    print(f"Must choose a data type for the column {column_name}. Type in the respective number: ")
+                    for index, data_type in enumerate(data_type_options):
+                        print(index, ' - ' + data_type)
+                    try:
+                        index_data_type = int(input().strip())
+                        column_data_type = data_type_options[index_data_type]
+                        query = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_data_type}"
+                        cursor.execute(query)
+                        conn.commit()
+                    except ValueError or IndexError:
+                        print("Not a valid option.")
+                        continue
+                    break
 
-            
-        #se nao: prosseguir com adicionar (se possivel) novos usuarios
-        if choice == 'n':
+                break
+        else:
+            break
 
-        #assim que definidas todas as colunas, adicionar os novos usuarios, e novas informaçoes de usuarios existentes      
-        for row in data[1:]:
-            name = row[name_index]
-            name_parts = name.split()
-            first_name = name_parts[0]
-            last_name = name_parts[-1]
-            email = row[email_index]
-            add_user(first_name,last_name,email)
+    for row in data.iterrows():
+        data = row[1]
+        columns_names = set(db_users_headers) & set(data.columns)
+        if table_name == 'users':
+            add_user(data,columns_names)
+        if table_name == 'books':
+            add_book(data,columns_names)
 
-        cursor.execute("SELECT COUNT(*) FROM users")
-        new_total_users = cursor.fetchone()[0]
-        new_users = new_total_users - total_users
-        return print(f"{new_users} new users added to Database.")
+    return print(f"{new_total_users} new users added to Database.")
     
     if "book_id" in data.columns:
-        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'")
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'books'")
         db_books_headers = cursor.fetchall() # LIST of tuples (header,)
         
         total_books = total_books()
@@ -108,31 +113,64 @@ def add_data():
 
         return print(f"{new_books} new books added to Database.")
 
-def add_user(first_name,last_name,email):
-    first_name = first_name.title()
-    last_name = last_name.title()
+def add_user(user_data,columns_names): # recebe listas(data_user,db_headers)
     try:
-        cursor.execute("INSERT INTO users(first_name,last_name,email,last_login) VALUES(%s,%s,%s,%s) RETURNING user_id", (first_name,last_name,email,datetime.datetime.now()))
+        columns_names_to_insert = ', '.join(columns_names)
+        values = ''
+        excluded_query = ''
+        for column in columns_names:
+            if values == '':
+                values += "'" + str(user_data[column]) + "'"
+            else:
+                values += ", '" + str(user_data[column]) + "'"
+
+            if excluded_query == '':
+                excluded_query += column + ' = EXCLUDED.' + column
+            else:
+                excluded_query += ", " + column + ' = EXCLUDED.' + column
+        query = f"""
+        INSERT INTO users({columns_names_to_insert}) VALUES({values})
+        ON CONFLICT (email)
+        DO UPDATE SET {excluded_query}
+        RETURNING user_id
+        """
+        cursor.execute(query)
         conn.commit()
-        return print(f" User added successfully. user_id = {cursor.fetchone()[0]}")
+        return print(f" User added/updated successfully. user_id = {cursor.fetchone()[0]}")
     except pg2.errors.UniqueViolation:
         conn.rollback()
-        return print(f"Error: The email: {email} is already in use.")
+        return print(f"Error: The email: {user_data['email']} is already in use.")
 
-def add_book(title,author,copies = 1):
-    cursor.execute("SELECT COUNT(book_id) FROM books WHERE title ILIKE %s", ('%' + title + '%',))
-    book_in_database = cursor.fetchone()[0]
-    if book_in_database:
-        cursor.execute("UPDATE books SET copies_available = copies_available + %s WHERE title ILIKE %s RETURNING book_id",(copies,title))
+def add_book(book_data,columns_names):
+    try:
+        columns_names_to_insert = ', '.join(columns_names)
+        values = ''
+        excluded_query = ''
+        for column in columns_names:
+            if column == 'copies_available':
+                new_copies_available = book_data(column)
+                continue
+            if values == '':
+                values += "'" + str(book_data[column]) + "'"
+            else:
+                values += ", '" + str(book_data[column]) + "'"
+
+            if excluded_query == '':
+                excluded_query += column + ' = EXCLUDED.' + column
+            else:
+                excluded_query += ", " + column + ' = EXCLUDED.' + column
+        query = f"""
+        INSERT INTO books({columns_names_to_insert}) VALUES({values})
+        ON CONFLICT (author, title)
+        DO UPDATE SET {excluded_query}, copies_available = copies_available + {new_copies_available}
+        RETURNING book_id
+        """
+        cursor.execute(query)
         conn.commit()
-        return print(f"Added {copies} copies of the book: {title} Id: {cursor.fetchone()[0]}")
-    
-    else:
-        title = title.title()
-        author = author.title()
-        cursor.execute("INSERT INTO books(title,author,copies_available) VALUES(%s,%s,%s) RETURNING book_id", (title,author,copies))
-        conn.commit()
-        return print(f" Book added successfully. book_id = {cursor.fetchone()[0]}")
+        return print(f" Book added/updated successfully. book_id = {cursor.fetchone()[0]}")
+    except pg2.errors.UniqueViolation:
+        conn.rollback()
+        return print(f"Error: The book: {book_data['title']} from Author: {book_data['author']} is already in DataBase")
 
 def loan_book(user_id,book_id):
 
@@ -277,3 +315,5 @@ def file_reader():
         except Exception as e:
             print(f"An error occurred while loading the file: {e}")
             return None
+
+add_data()
