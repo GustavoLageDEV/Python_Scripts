@@ -42,52 +42,55 @@ def add_data():
         db_users_headers = [header[0] for header in db_users_headers] # MADE A DIRECT LIST OF HEADERS
         new_headers = [column for column in (set(data.columns) - set(db_users_headers))]
 
-        print(f"These are the columns not present on our DataBase: " + ', '.join(new_headers))
-        choice = input("Would you like to include a new column into our database? Y or N").lower().strip()[0]
-        if choice not in ['y','n']:
-            print("Invalid option: Try Y or N.")
-            continue
+        if new_headers != []:
+            print(f"These are the columns not present on our DataBase: " + ', '.join(new_headers))
+            choice = input("Would you like to include a new column into our database? Y or N").lower().strip()[0]
+            if choice not in ['y','n']:
+                print("Invalid option: Try Y or N.")
+                continue
 
-        if choice == 'y':
-            while True:
-                print("From the following, choose what column to input in our Database. Type in the respective number (one at a time): ")
-                for index, header in enumerate(new_headers):
-                    print(index, ' - ' + header)
-                try:
-                    index_new_header = int(input().strip())
-                    column_name = new_headers[index_new_header]
-                except ValueError or IndexError:
-                    print("Not a valid option.")
-                    continue
-                data_type_options = ('INT','VARCHAR','DATE','TIMESTAMP')
+            if choice == 'y':
                 while True:
-                    print(f"Must choose a data type for the column {column_name}. Type in the respective number: ")
-                    for index, data_type in enumerate(data_type_options):
-                        print(index, ' - ' + data_type)
+                    print("From the following, choose what column to input in our Database. Type in the respective number (one at a time): ")
+                    for index, header in enumerate(new_headers):
+                        print(index, ' - ' + header)
                     try:
-                        index_data_type = int(input().strip())
-                        column_data_type = data_type_options[index_data_type]
-                        query = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_data_type}"
-                        cursor.execute(query)
-                        conn.commit()
+                        index_new_header = int(input().strip())
+                        column_name = new_headers[index_new_header]
                     except ValueError or IndexError:
                         print("Not a valid option.")
                         continue
-                    break
+                    data_type_options = ('INT','VARCHAR','DATE','TIMESTAMP')
+                    while True:
+                        print(f"Must choose a data type for the column {column_name}. Type in the respective number: ")
+                        for index, data_type in enumerate(data_type_options):
+                            print(index, ' - ' + data_type)
+                        try:
+                            index_data_type = int(input().strip())
+                            column_data_type = data_type_options[index_data_type]
+                            query = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_data_type}"
+                            cursor.execute(query)
+                            conn.commit()
+                        except ValueError or IndexError:
+                            print("Not a valid option.")
+                            continue
+                        break
 
+                    break
+            else:
                 break
         else:
             break
 
     for row in data.iterrows():
-        data = row[1]
+        row_data = row[1]
         columns_names = set(db_users_headers) & set(data.columns)
         if table_name == 'users':
-            add_user(data,columns_names)
+            add_user(row_data,columns_names)
         if table_name == 'books':
-            add_book(data,columns_names)
+            add_book(row_data,columns_names)
 
-    return print(f"{new_total_users} new users added to Database.")
+    return print(f"Database updated.")
     
     if "book_id" in data.columns:
         cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'books'")
@@ -147,13 +150,14 @@ def add_book(book_data,columns_names):
         values = ''
         excluded_query = ''
         for column in columns_names:
-            if column == 'copies_available':
-                new_copies_available = book_data(column)
-                continue
             if values == '':
                 values += "'" + str(book_data[column]) + "'"
             else:
                 values += ", '" + str(book_data[column]) + "'"
+
+            if column == 'copies_available':
+                new_copies_available = book_data[column]
+                continue
 
             if excluded_query == '':
                 excluded_query += column + ' = EXCLUDED.' + column
