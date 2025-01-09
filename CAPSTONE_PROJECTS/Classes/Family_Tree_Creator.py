@@ -54,7 +54,7 @@ def sort_older_to_younger(family_list):
 
 		return age_sorted_list
 	
-def sort_marriage(family_list): # 
+def sort_marriage(family_list): 
 	if family_list == []:
 		return family_list
 	else:

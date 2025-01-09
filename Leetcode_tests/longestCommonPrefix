@@ -1,0 +1,13 @@
+def longestCommonPrefix(strs):
+    if len(strs) == 1:
+        return strs[0]
+    prefix = ''
+    for letter in strs[0]:
+        for str in strs[1:]:
+            if str[:len(prefix + letter)] != (prefix + letter):
+                return prefix
+            prefix_bool = True
+        if prefix_bool:
+            prefix += letter
+
+    return prefix

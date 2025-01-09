@@ -1,0 +1,21 @@
+
+def isValid(s):
+    """
+    :type s: str
+    :rtype: bool
+    """
+    opening_brackets = ('(', '[', '{')
+    valid_parentheses = ('()', '[]', '{}')
+    stack = []
+
+    for caract in s:
+        if caract in opening_brackets:
+            stack.append(caract)
+        elif stack == []:
+            return False
+        else:
+            if (stack[-1] + caract) in valid_parentheses:
+                stack.pop()
+            else:
+                return False
+    return not stack

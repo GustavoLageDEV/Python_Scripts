@@ -166,7 +166,7 @@ def add_book(book_data,columns_names):
         query = f"""
         INSERT INTO books({columns_names_to_insert}) VALUES({values})
         ON CONFLICT (author, title)
-        DO UPDATE SET {excluded_query}, copies_available = copies_available + {new_copies_available}
+        DO UPDATE SET {excluded_query}, copies_available = EXCLUDED.copies_available + {new_copies_available}
         RETURNING book_id
         """
         cursor.execute(query)
