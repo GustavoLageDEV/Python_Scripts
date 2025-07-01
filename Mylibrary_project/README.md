@@ -28,6 +28,6 @@
 
 Instale as dependências:
 
-psycopg2
-pandas
+- psycopg2
+- pandas
 
